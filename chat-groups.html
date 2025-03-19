@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat Groups</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap">
+    <style>
+        /* General Page Styling */
+        body, html {
+            font-family: 'Roboto', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: linear-gradient(45deg, #6a11cb 0%, #2575fc 100%);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            width: 90%;
+            max-width: 1000px;
+            padding: 20px;
+            min-height: 100vh;
+            margin-top: 20px;
+        }
+
+        .dashboard-box {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            width: 100%;
+            max-width: 1000px;
+            margin-top: 20px;
+            overflow-y: auto;
+            max-height: 90vh;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .dashboard-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            max-width: 200px;
+            margin: 10px auto;
+            display: block;
+            transition: background-color 0.3s, box-shadow 0.3s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+            text-align: center;
+        }
+
+        .dashboard-btn:hover {
+            background-color: #45a049;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25);
+        }
+
+        .button-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .refresh-info {
+            text-align: center;
+            color: #666;
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+
+        .next-refresh {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .container {
+                width: 95%;
+                padding: 10px;
+            }
+
+            .dashboard-box {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .dashboard-btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="dashboard-box">
+            <h1>Your Chat Groups</h1>
+            <div id="group-buttons" class="button-container"></div>
+            <div class="refresh-info">
+                Groups are refreshed daily at 5:00 PM. 
+                <br>
+                Last refresh: <span id="last-refresh"></span>
+                <br>
+                Next refresh: <span id="next-refresh" class="next-refresh"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const userEmail = localStorage.getItem('userEmail');
+            if (!userEmail) {
+                alert("Please log in first.");
+                window.location.href = 'index.html';
+                return;
+            }
+
+            // Function to calculate next refresh time
+            function getNextRefreshTime() {
+                const now = new Date();
+                const nextRefresh = new Date(now);
+                nextRefresh.setHours(17, 0, 0, 0); // Set to 5 PM
+                
+                // If current time is past 5 PM, set to next day
+                if (now > nextRefresh) {
+                    nextRefresh.setDate(nextRefresh.getDate() + 1);
+                }
+                
+                return nextRefresh;
+            }
+
+            // Function to update refresh times
+            function updateRefreshTimes() {
+                const now = new Date();
+                document.getElementById('last-refresh').textContent = now.toLocaleString();
+                
+                const nextRefresh = getNextRefreshTime();
+                document.getElementById('next-refresh').textContent = nextRefresh.toLocaleString();
+            }
+
+            // Function to fetch and display groups
+            async function fetchAndDisplayGroups() {
+                try {
+                    const response = await fetch('/get_groups/');
+                    const groups = await response.json();
+                    
+                    const groupContainer = document.getElementById("group-buttons");
+                    groupContainer.innerHTML = ''; // Clear existing groups
+                    
+                    // Filter groups for the current user
+                    const userGroups = groups.filter(group => 
+                        group.email.split(',').map(email => email.trim()).includes(userEmail)
+                    );
+
+                    if (userGroups.length === 0) {
+                        groupContainer.innerHTML = '<p>You are not part of any groups yet. Check back later!</p>';
+                        return;
+                    }
+
+                    userGroups.forEach(group => {
+                        const button = document.createElement("button");
+                        button.className = "dashboard-btn";
+                        button.innerText = group.group_name;
+                        button.onclick = () => {
+                            window.location.href = `chat.html?group=${encodeURIComponent(group.group_name)}&email=${encodeURIComponent(userEmail)}`;
+                        };
+                        groupContainer.appendChild(button);
+                    });
+
+                    // Update refresh times
+                    updateRefreshTimes();
+                } catch (error) {
+                    console.error('Error fetching groups:', error);
+                    alert('Failed to load groups. Please try again later.');
+                }
+            }
+
+            // Function to check if refresh is needed
+            function checkRefresh() {
+                const now = new Date();
+                const nextRefresh = getNextRefreshTime();
+                
+                if (now >= nextRefresh) {
+                    fetchAndDisplayGroups();
+                }
+            }
+
+            // Initial fetch
+            fetchAndDisplayGroups();
+
+            // Check for refresh every hour
+            setInterval(checkRefresh, 60 * 60 * 1000);
+        });
+    </script>
+</body>
+</html>
